@@ -393,6 +393,61 @@ less.Parser = function Parser(env) {
             chunks = [];
             input = str.replace(/\r\n/g, '\n');
 
+/*
+ * ePages: BEGIN
+ */
+			if( less.env === 'development' ){
+				var d_rSelectors			= /([^"'`\{\}\/\(\)]+?)\{/g,
+					d_rComments				= /\/\*(?:[^*]|\*+[^\/*])*\*+\/|\/\/.*/g,
+					d_rCommentPlaceholders	= /<COMMENT>/g,
+					d_rLinemarks			= /((?:^|\}|\);|<COMMENT>)+?)([^\}\{\<]+?)(?:<LINE:(\d+)>)/g,
+					d_rLinemarkPlaceholders	= /<LINE:(\d+)>/g,
+					d_rCommentsAndLinemark	= /(<COMMENT>)\s*(<LINE:\d+>)/g,
+					d_rNewline				= /\n/,
+					d_rNewlinesNot			= /[^\n]/g,
+					d_file					= env.paths[0]+env.filename,
+					d_comments				= [],
+					d_lines,
+					d_length,
+					d_line,
+					d_index;
+
+				// remove and store comments
+				input = input
+					.replace(d_rComments, function( all ){
+						d_comments.push(all);
+						return '<COMMENT>' + all.replace(d_rNewlinesNot,'');
+					});
+
+				d_lines = input.split(d_rNewline);
+				d_length = d_lines.length;
+				d_index = 0;
+
+				// set placeholder
+				for( ; d_index < d_length ; d_index++ ){
+					d_lines[ d_index ] = d_lines[ d_index ].replace(d_rSelectors, function( all, selector ){
+						return selector + '<LINE:'+(d_index+1)+'> \n {';
+					});
+				}
+				// merge with line breaks
+				input = d_lines.join("\n");
+				// move line marks before comments
+				input = input.replace(d_rCommentsAndLinemark, "$2 $1");
+				// add debug comments before selectors
+				input = input.replace(d_rLinemarks, function( all, prev, selector, line ){
+							return prev + '\n /* [file:"'+d_file+'"] [line:'+line+'] */ ' + selector;
+						});
+				// remove placeholder
+				input = input.replace(d_rLinemarkPlaceholders, '');
+				// restore comments
+				input = input.replace(d_rCommentPlaceholders, function( all ){
+							return d_comments.shift();
+						});
+			}
+/*
+ * ePages: END
+ */
+
             // Split the input into chunks.
             chunks = (function (chunks) {
                 var j = 0,
@@ -2222,7 +2277,18 @@ tree.Import = function (path, imports, features, index) {
         this.path = path.value.value || path.value;
     }
 
+/*
+ * ePages: BEGIN
     this.css = /css(\?.*)?$/.test(this.path);
+ */
+
+    this.css = false;
+    if (that._path.paths) {
+		this.path = this.path.replace(that._path.paths[0],'');
+	}
+/*
+ * ePages: END
+ */
 
     // Only pre-compile .less files
     if (! this.css) {
@@ -2951,6 +3017,16 @@ less.env = less.env || (location.hostname == '127.0.0.1' ||
                         isFileProtocol                   ? 'development'
                                                          : 'production');
 
+/*
+ * ePages: BEGIN
+ */
+if( window.epConfig && epConfig.debugLevel ){
+	less.env = 'development';
+}
+/*
+ * ePages: END
+ */
+
 // Load styles asynchronously (default: false)
 //
 // This is set to `false` by default, so that the body
@@ -3016,6 +3092,16 @@ less.refresh = function (reload) {
     startTime = endTime = new(Date);
 
     loadStyleSheets(function (e, root, _, sheet, env) {
+/*
+ * ePages: BEGIN
+ */
+    	if( !env && !sheet ){
+    		sheet = root;
+    		env = _;
+    	}
+/*
+ * ePages: END
+ */
         if (env.local) {
             log("loading " + sheet.href + " from cache.");
         } else {
@@ -3222,7 +3308,14 @@ function error(e, href) {
     var id = 'less-error-message:' + extractId(href);
     var template = '<li><label>{line}</label><pre class="{class}">{content}</pre></li>';
     var elem = document.createElement('div'), timer, content, error = [];
-    var filename = e.filename || href;
+/*
+ * ePages: BEGIN
+ 	var filename = e.filename || href;
+ */
+ 	var filename = href;
+/*
+ * ePages: END
+ */
 
     elem.id        = id;
     elem.className = "less-error-message";
