@@ -1,3 +1,6 @@
+.mixin (...) {
+  variadic: true;
+}
 .mixin () {
     zero: 0;
 }
@@ -76,7 +79,7 @@
 
 
 .border-radius (@r) {
-    both: @r * 10;
+    both: (@r * 10);
 }
 .border-radius (@r, left) {
     left: @r;
